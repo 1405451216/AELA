@@ -1,0 +1,27 @@
+sequenceDiagram
+    autonumber
+    participant R as Renderer (preload/api/sync.ts)
+    participant M as SyncService (main)
+    participant S as sync-server (node, src/server/sync-server.ts)
+
+    Note over R,S: 现状（改前）— apiKey 置于 URL query（不安全）
+    R->>M: connect(SyncConfig{serverUrl, roomId, apiKey})
+    M->>S: WebSocket(serverUrl/ws?roomId=..&apiKey=..)  %% SyncService.ts:235
+    S->>S: url.searchParams.get('apiKey')  %% sync-server.ts:117
+    alt apiKey 缺失
+        S-->>M: ws.close(4001)
+    else 通过
+        S-->>M: 101 + welcome
+    end
+
+    Note over R,S: 目标（T4 改后）— apiKey 改 X-Api-Key 请求头/子协议 + 限流
+    R->>M: connect(SyncConfig{serverUrl, roomId, apiKey})
+    M->>S: WebSocket(serverUrl/ws?roomId=.., { headers: { 'X-Api-Key': apiKey } })
+    S->>S: req.headers['x-api-key'] + 令牌桶限流
+    alt apiKey 无效 / 超限
+        S-->>M: ws.close(4001) 或 429 限流拒绝
+    else 通过
+        S-->>M: 101 + welcome
+        M->>S: file_update / awareness (SyncFileMessage)
+        S-->>M: broadcastToRoom
+    end

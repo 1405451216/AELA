@@ -1,0 +1,71 @@
+classDiagram
+    %% ===== 现有校验基础设施（Q-2/S-3 复用）=====
+    class schemas {
+        +ZodSchema sessionIdSchema
+        +ZodSchema filePathSchema
+        +ZodSchema nonEmptyStringSchema
+        +ZodSchema terminalRunCommandSchema
+        +validateInput(schema, data) success|error
+    }
+    class ipcHelpers {
+        +wrap(fn) IPCResponse
+    }
+    class Handler {
+        +registerXxxHandlers(params)
+    }
+    Handler ..> schemas : 入口调用 validateInput
+    Handler ..> ipcHelpers : 包 wrap()
+
+    %% ===== S-1 SecretStore（fail-closed）=====
+    class SecretStore {
+        <<interface>>
+        +encrypt(plaintext) string
+        +decrypt(stored) string
+        +isSecure() boolean
+    }
+    class createSecretStore {
+        +createSecretStore(onInsecureFallback?) SecretStore
+    }
+    createSecretStore ..|> SecretStore : 返回
+    note for SecretStore "insecure 时 encrypt 抛错/内存态\n拒绝明文落盘（T3）"
+
+    %% ===== S-2 SyncService 客户端 =====
+    class SyncService {
+        -ws: WebSocket
+        +connect(config)
+        -openWebSocket(config)  %% L235 改传参
+    }
+    note for SyncService "T4: apiKey 改 header/子协议\n去掉 query"
+
+    %% ===== Q-1 i18n 拆分（内容型，导出面不变）=====
+    class i18n_index {
+        <<barrel>>
+        +Lang
+        +dict
+        +setLang / getLang
+        +subscribeLang / getLangSnapshot
+        +translate / translateF
+    }
+    class i18n_zh
+    class i18n_en
+    class i18n_common
+    i18n_index o-- i18n_zh
+    i18n_index o-- i18n_en
+    i18n_index o-- i18n_common
+
+    %% ===== Q-1 promptContents 拆分（内容型，13 常量不变）=====
+    class promptContents_index {
+        <<barrel>>
+        +promptBase
+        +promptCoding* / promptDaily* (12 变体)
+    }
+    class prompt_base
+    class prompt_coding
+    class prompt_daily
+    promptContents_index o-- prompt_base
+    promptContents_index o-- prompt_coding
+    promptContents_index o-- prompt_daily
+    class PromptBuilder {
+        +build(...) string
+    }
+    PromptBuilder ..> promptContents_index : from './promptContents'

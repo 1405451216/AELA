@@ -1,0 +1,49 @@
+# ===== Dependencies =====
+node_modules/
+.pnp/
+.pnp.js
+
+# ===== Build outputs =====
+dist/
+out/
+release/
+*.exe
+*.dll
+*.pak
+*.bin
+
+# ===== Coverage & test reports =====
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+blob-report/
+
+# ===== Logs =====
+logs/
+*.log
+*.log.*
+dev_*.log
+debug_output.log
+coverage.log
+test_*.log
+dev_final*.log
+dev_server*.log
+dev_verify.log
+
+# ===== Env & secrets =====
+.env
+.env.*
+*.local
+
+# ===== OS / editor =====
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# ===== Misc =====
+npm-debug.log*
+yarn-error.log*

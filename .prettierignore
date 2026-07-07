@@ -1,0 +1,21 @@
+# Build output
+out/
+dist/
+release/
+
+# Dependencies
+node_modules/
+
+# SDK (external)
+../codecast/AgentPrimordia/
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Generated files
+src/renderer/src/i18n/locales/
+
+# Assets
+resources/

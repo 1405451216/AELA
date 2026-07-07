@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AELA 小猫打字动画预览</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: 'Inter', system-ui, sans-serif;
+      color: #e2e8f0;
+    }
+    h2 { margin-bottom: 20px; font-weight: 500; color: #a78bfa; font-size: 18px; }
+    .controls { margin-top: 20px; display: flex; gap: 16px; align-items: center; }
+    .controls button {
+      background: #7c3aed; color: white; border: none;
+      padding: 8px 24px; border-radius: 8px; cursor: pointer; font-size: 14px;
+    }
+    .controls button:hover { background: #8b5cf6; }
+    .controls span { font-size: 13px; color: #94a3b8; }
+    .info { margin-top: 12px; font-size: 12px; color: #64748b; text-align: center; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <h2>🐱 AELA 小猫打字动画</h2>
+  <canvas id="c"></canvas>
+  <div class="controls">
+    <button onclick="sz=Math.max(100,sz-20);document.getElementById('sl').textContent=sz+'px'">−</button>
+    <span id="sl">180px</span>
+    <button onclick="sz=Math.min(360,sz+20);document.getElementById('sl').textContent=sz+'px'">+</button>
+  </div>
+  <div class="info">
+    紫色小猫 · 坐在桌前打字 · 眨眼(含双重眨) · ω嘴 · 摇尾巴<br>
+    腮红 · 爪子肉垫 · 键盘高亮 · 代码符号飞出 · 呼吸
+  </div>
+
+  <script>
+    let sz = 180;
+    const logoImg = new Image();
+    logoImg.src = 'aela-logo.png';
+    const canvas = document.getElementById('c');
+    const ctx = canvas.getContext('2d');
+    const dpr = window.devicePixelRatio || 1;
+    const t0 = performance.now();
+
+    // 调色板
+    const FUR='#9f7aea',FUR_DARK='#7c3aed',FUR_LIGHT='#c4b5fd',FUR_SHADOW='#6d28d9';
+    const EAR_INNER='#fbb6ce',NOSE='#f472b6',EYE_IRIS='#4c1d95',BLUSH='#f9a8d4',PAW_PAD='#fbb6ce';
+    const MONITOR_FRAME='#3a3a4e',MONITOR_SCREEN='#0f0f1a',KB_BASE='#252538',KB_KEY='#3a3a4e',KB_ACTIVE='#7c3aed',CODE='#a78bfa';
+
+    function animate(now) {
+      const size = sz, s = size / 180;
+      const cw = size * 2.0, ch = size * 1.7;
+      canvas.width = cw * dpr; canvas.height = ch * dpr;
+      canvas.style.width = cw + 'px'; canvas.style.height = ch + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, cw, ch);
+
+      const elapsed = (now - t0) / 1000;
+      const cx = cw / 2, ground = ch * 0.78;
+      const ts = 4.0, tp = (elapsed * ts) % (Math.PI * 2);
+      const lU = Math.sin(tp) > 0.2, rU = Math.sin(tp + Math.PI) > 0.2;
+      const ki = Math.floor(elapsed * ts * 3) % 10;
+      const bb = Math.sin(elapsed * ts) * 1.8 * s;
+      const ht = Math.sin(elapsed * ts * 0.5) * 0.02;
+      const tw = Math.sin(elapsed * 2.5) * 12 * s;
+
+      // 光晕
+      const ga = 0.06 + 0.03 * Math.sin(elapsed * 1.3);
+      const gg = ctx.createRadialGradient(cx, ground - 60*s, 10*s, cx, ground - 60*s, 100*s);
+      gg.addColorStop(0, 'rgba(124,58,237,'+ga+')'); gg.addColorStop(1, 'rgba(124,58,237,0)');
+      ctx.fillStyle = gg; ctx.fillRect(0, 0, cw, ch);
+
+      // 桌子
+      ctx.fillStyle = '#33334a'; ctx.beginPath(); ctx.roundRect(cx-90*s, ground-8*s, 180*s, 12*s, [3*s,3*s,0,0]); ctx.fill();
+      ctx.fillStyle = '#2a2a3e'; ctx.fillRect(cx-82*s, ground+4*s, 8*s, 40*s); ctx.fillRect(cx+74*s, ground+4*s, 8*s, 40*s);
+      ctx.fillStyle = 'rgba(167,139,250,0.04)'; ctx.fillRect(cx-88*s, ground-8*s, 176*s, 3*s);
+
+      // 显示器
+      const mw=65*s, mh=48*s, mx=cx-mw/2, my=ground-mh-18*s;
+      ctx.fillStyle = MONITOR_FRAME; ctx.fillRect(cx-5*s, my+mh, 10*s, 14*s);
+      ctx.beginPath(); ctx.ellipse(cx, my+mh+14*s, 14*s, 4*s, 0, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.roundRect(mx-4*s, my-4*s, mw+8*s, mh+8*s, 5*s); ctx.fill();
+      ctx.fillStyle = MONITOR_SCREEN; ctx.beginPath(); ctx.roundRect(mx, my, mw, mh, 2*s); ctx.fill();
+
+      if (logoImg.complete && logoImg.naturalWidth > 0) {
+        ctx.save(); ctx.globalAlpha = 0.85;
+        ctx.drawImage(logoImg, mx+3*s, my+3*s, 15*s, 15*s); ctx.restore();
+      }
+
+      ctx.font = 'bold '+(4.5*s)+'px monospace';
+      const cur = Math.sin(elapsed * 5) > 0;
+      [['const aela =','#c4b5fd'],['  await ai.run()','#a78bfa'],['  // ✨ magic','#64748b'],['  return code','#a78bfa']].forEach(([l,c],i) => {
+        ctx.fillStyle = c;
+        ctx.fillText(i===2&&cur?l+'▎':l, mx+20*s, my+14*s+i*6.5*s);
+      });
+
+      ctx.fillStyle='#ef4444'; ctx.beginPath(); ctx.arc(mx+5*s,my+5*s,1.8*s,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#eab308'; ctx.beginPath(); ctx.arc(mx+10*s,my+5*s,1.8*s,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle='#22c55e'; ctx.beginPath(); ctx.arc(mx+15*s,my+5*s,1.8*s,0,Math.PI*2); ctx.fill();
+
+      // 键盘
+      const kx=cx-30*s, ky=ground-6*s;
+      ctx.fillStyle=KB_BASE; ctx.beginPath(); ctx.roundRect(kx,ky,60*s,10*s,2*s); ctx.fill();
+      for(let r=0;r<2;r++) for(let c=0;c<9;c++){
+        ctx.fillStyle=(r*9+c)===ki?KB_ACTIVE:KB_KEY;
+        ctx.beginPath(); ctx.roundRect(kx+2*s+c*6.2*s,ky+1.5*s+r*4.2*s,5*s,3*s,0.8*s); ctx.fill();
+        if((r*9+c)===ki){ctx.save();ctx.globalAlpha=0.3;ctx.fillStyle='#a78bfa';
+        ctx.beginPath();ctx.arc(kx+2*s+c*6.2*s+2.5*s,ky-0.5*s+r*4.2*s,3*s,0,Math.PI*2);ctx.fill();ctx.restore();}
+      }
+
+      // 猫
+      const catBY = ground - 2*s + bb;
+      ctx.save(); ctx.translate(cx, catBY-35*s); ctx.rotate(ht); ctx.translate(-cx,-(catBY-35*s));
+
+      // 尾巴
+      ctx.strokeStyle=FUR; ctx.lineWidth=6*s; ctx.lineCap='round'; ctx.beginPath();
+      ctx.moveTo(cx+24*s,catBY-12*s);
+      ctx.bezierCurveTo(cx+42*s,catBY-22*s+tw*0.4, cx+48*s,catBY-48*s+tw*0.8, cx+38*s,catBY-58*s+tw);
+      ctx.stroke();
+      ctx.strokeStyle=FUR_DARK; ctx.lineWidth=5*s; ctx.beginPath();
+      ctx.moveTo(cx+42*s,catBY-46*s+tw*0.7);
+      ctx.quadraticCurveTo(cx+44*s,catBY-54*s+tw*0.9, cx+38*s,catBY-58*s+tw);
+      ctx.stroke();
+
+      // 身体
+      ctx.fillStyle=FUR; ctx.beginPath(); ctx.ellipse(cx,catBY-18*s,28*s,22*s,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=FUR_LIGHT; ctx.beginPath(); ctx.ellipse(cx,catBY-12*s,18*s,14*s,0,0,Math.PI*2); ctx.fill();
+      ctx.strokeStyle='rgba(124,58,237,0.15)'; ctx.lineWidth=0.8*s; ctx.beginPath();
+      ctx.moveTo(cx,catBY-26*s); ctx.lineTo(cx,catBY+2*s); ctx.stroke();
+
+      // 头
+      const hx=cx, hy=catBY-46*s;
+      // 耳朵
+      ctx.fillStyle=FUR; ctx.beginPath(); ctx.moveTo(hx-20*s,hy-6*s); ctx.lineTo(hx-28*s,hy-34*s); ctx.lineTo(hx-5*s,hy-14*s); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=EAR_INNER; ctx.beginPath(); ctx.moveTo(hx-19*s,hy-9*s); ctx.lineTo(hx-25*s,hy-29*s); ctx.lineTo(hx-8*s,hy-14*s); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=FUR; ctx.beginPath(); ctx.moveTo(hx+20*s,hy-6*s); ctx.lineTo(hx+28*s,hy-34*s); ctx.lineTo(hx+5*s,hy-14*s); ctx.closePath(); ctx.fill();
+      ctx.fillStyle=EAR_INNER; ctx.beginPath(); ctx.moveTo(hx+19*s,hy-9*s); ctx.lineTo(hx+25*s,hy-29*s); ctx.lineTo(hx+8*s,hy-14*s); ctx.closePath(); ctx.fill();
+      // 头圆
+      ctx.fillStyle=FUR; ctx.beginPath(); ctx.ellipse(hx,hy,25*s,20*s,0,0,Math.PI*2); ctx.fill();
+      ctx.fillStyle=FUR_LIGHT; ctx.beginPath(); ctx.ellipse(hx,hy+5*s,17*s,12*s,0,0,Math.PI*2); ctx.fill();
+      // 花纹
+      ctx.fillStyle=FUR_DARK; ctx.beginPath(); ctx.moveTo(hx,hy-18*s); ctx.lineTo(hx-5*s,hy-10*s); ctx.lineTo(hx+5*s,hy-10*s); ctx.closePath(); ctx.fill();
+
+      // 眨眼
+      const bc=elapsed%4.8; let eo=1;
+      if(bc>4.0&&bc<4.15) eo=1-Math.min(1,(bc-4.0)/0.08);
+      else if(bc>=4.15&&bc<4.35) eo=Math.min(1,(bc-4.15)/0.12);
+      if(bc>4.4&&bc<4.5) eo=1-Math.min(1,(bc-4.4)/0.05);
+      else if(bc>=4.5&&bc<4.6) eo=Math.min(1,(bc-4.5)/0.08);
+
+      [[-10,1],[10,1]].forEach(([ox])=>{
+        const ex=hx+ox*s, ey=hy-1*s;
+        if(eo>0.15){
+          ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(ex,ey,6.5*s,7*s*eo,0,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle=EYE_IRIS; ctx.beginPath(); ctx.ellipse(ex+0.5*s,ey+0.5*s,4*s,4.5*s*eo,0,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='#1e1b4b'; ctx.beginPath(); ctx.ellipse(ex+0.5*s,ey+0.5*s,2.2*s,2.5*s*eo,0,0,Math.PI*2); ctx.fill();
+          ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(ex+2*s,ey-2*s,1.5*s,0,Math.PI*2); ctx.fill();
+          ctx.beginPath(); ctx.arc(ex-1*s,ey+2*s,0.8*s,0,Math.PI*2); ctx.fill();
+        } else {
+          ctx.strokeStyle=FUR_SHADOW; ctx.lineWidth=1.5*s;
+          ctx.beginPath(); ctx.moveTo(ex-6*s,ey); ctx.quadraticCurveTo(ex,ey+2*s,ex+6*s,ey); ctx.stroke();
+        }
+      });
+
+      // 腮红
+      ctx.fillStyle=BLUSH; ctx.save(); ctx.globalAlpha=0.35;
+      ctx.beginPath(); ctx.ellipse(hx-16*s,hy+5*s,5*s,3*s,-0.2,0,Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.ellipse(hx+16*s,hy+5*s,5*s,3*s,0.2,0,Math.PI*2); ctx.fill();
+      ctx.restore();
+
+      // 鼻子
+      ctx.fillStyle=NOSE; ctx.beginPath();
+      ctx.moveTo(hx,hy+5*s);
+      ctx.bezierCurveTo(hx-3*s,hy+4*s,hx-3.5*s,hy+8*s,hx,hy+8.5*s);
+      ctx.bezierCurveTo(hx+3.5*s,hy+8*s,hx+3*s,hy+4*s,hx,hy+5*s);
+      ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.3)'; ctx.beginPath(); ctx.arc(hx-0.5*s,hy+6*s,1*s,0,Math.PI*2); ctx.fill();
+
+      // 嘴
+      ctx.strokeStyle=FUR_SHADOW; ctx.lineWidth=1.2*s; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(hx,hy+8.5*s); ctx.lineTo(hx,hy+11*s); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx-4*s,hy+11*s,4*s,Math.PI*1.85,Math.PI*1.15,true); ctx.stroke();
+      ctx.beginPath(); ctx.arc(hx+4*s,hy+11*s,4*s,Math.PI*1.85,Math.PI*1.15,true); ctx.stroke();
+
+      // 胡须
+      ctx.strokeStyle=FUR_SHADOW; ctx.lineWidth=0.7*s;
+      const wb=Math.sin(elapsed*1.5)*1*s;
+      [[-1,1],[1,1]].forEach(([dx])=>{
+        ctx.beginPath(); ctx.moveTo(hx+dx*10*s,hy+6*s); ctx.lineTo(hx+dx*28*s,hy+3*s+wb); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(hx+dx*10*s,hy+8*s); ctx.lineTo(hx+dx*27*s,hy+9*s+wb); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(hx+dx*10*s,hy+10*s); ctx.lineTo(hx+dx*26*s,hy+14*s+wb); ctx.stroke();
+      });
+
+      // 爪
+      const lpY=lU?-4*s:0, rpY=rU?-4*s:0;
+      [[-16,-0.1,1],[16,0.1,1]].forEach(([ox,rot,sign])=>{
+        const px=cx+ox*s, py=catBY-6*s+(ox<0?lpY:rpY);
+        ctx.fillStyle=FUR; ctx.beginPath(); ctx.ellipse(px,py,9*s,6.5*s,rot,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle=PAW_PAD;
+        ctx.beginPath(); ctx.ellipse(px,py+1.5*s,4.5*s,3*s,0,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(px-3.5*s,py-1.5*s,1.6*s,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(px,py-2.5*s,1.6*s,0,Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(px+3.5*s,py-1.5*s,1.6*s,0,Math.PI*2); ctx.fill();
+      });
+
+      // 飞出的符号
+      const syms=['{','}','<','>','/',';','✦','★','//','='];
+      for(let i=0;i<4;i++){
+        const age=((elapsed*ts*1.5+i*1.2)%3.0);
+        if(age<1.8){
+          const idx=(ki+i*3)%syms.length;
+          ctx.save(); ctx.globalAlpha=Math.max(0,1-age/1.8)*0.55;
+          ctx.fillStyle=CODE; ctx.font='bold '+(6*s)+'px monospace';
+          ctx.fillText(syms[idx],cx+(i-1.5)*18*s,ky-10*s-age*18*s);
+          ctx.restore();
+        }
+      }
+
+      ctx.restore();
+      requestAnimationFrame(animate);
+    }
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
