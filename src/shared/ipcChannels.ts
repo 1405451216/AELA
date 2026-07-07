@@ -175,6 +175,14 @@ export const IPC_CHANNELS = {
   SKILL_MARKET_UNINSTALL: 'skill-market:uninstall',
   SKILL_MARKET_INSTALLED: 'skill-market:installed',
 
+  // ===== 安全沙箱 =====
+  SANDBOX_LIST: 'sandbox:list',
+  SANDBOX_REPLAY: 'sandbox:replay',
+  SANDBOX_EXPORT: 'sandbox:export',
+  SANDBOX_PERMISSION: 'sandbox:permission',
+  SANDBOX_GRANT: 'sandbox:grant',
+  SANDBOX_REVOKE: 'sandbox:revoke',
+
   // ===== 本地模型 =====
   LOCAL_ENGINE_STATUS: 'local-engine:status',
   LOCAL_ENGINE_LIST: 'local-engine:list',
