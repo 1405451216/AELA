@@ -1,17 +1,27 @@
 // 成本追踪服务
 // [重构] 使用 SDK 原生 PricingCalculator + defaultPricingTable
+// [升级] 新增 today/month/session/day 聚合、动态阈值、趋势、CSV 导出
 import Store from 'electron-store'
 import { PricingCalculator, defaultPricingTable, type ModelPricingInfo as SDKModelPricing } from '@agentprimordia/sdk'
 import type { Usage } from '@agentprimordia/sdk'
 import type { CostRecord, CostSummary, ModelCost, BudgetConfig, ModelPricing } from '@shared/types'
+import { getModelContextWindow } from '@shared/types/model'
+import type { ModelConfig } from '@shared/types/model'
 
 interface CostStoreSchema {
   budget: BudgetConfig | null
   customPricing: Record<string, ModelPricing>
   records: CostRecord[]
-  totals: { totalCostUSD: number; totalPromptTokens: number; totalCompTokens: number; totalTokens: number; callCount: number }
+  totals: {
+    totalCostUSD: number
+    totalPromptTokens: number
+    totalCompTokens: number
+    totalTokens: number
+    callCount: number
+  }
 }
 
+// AELA 额外模型定价（SDK 未覆盖的新模型）
 const AELA_EXTRA_PRICING: Record<string, ModelPricing> = {
   'claude-sonnet-4-20250514': { model: 'claude-sonnet-4-20250514', provider: 'anthropic', promptPricePer1M: 3.0, completionPricePer1M: 15.0 },
   'gemini-2.0-flash': { model: 'gemini-2.0-flash', provider: 'google', promptPricePer1M: 0.1, completionPricePer1M: 0.4 },
@@ -33,7 +43,12 @@ export class CostTrackerService {
   constructor(budget?: BudgetConfig) {
     this.store = new Store<CostStoreSchema>({
       name: 'aela-cost',
-      defaults: { budget: null, customPricing: {}, records: [], totals: { totalCostUSD: 0, totalPromptTokens: 0, totalCompTokens: 0, totalTokens: 0, callCount: 0 } },
+      defaults: {
+        budget: null,
+        customPricing: {},
+        records: [],
+        totals: { totalCostUSD: 0, totalPromptTokens: 0, totalCompTokens: 0, totalTokens: 0, callCount: 0 },
+      },
     })
     const sdkTable = defaultPricingTable()
     for (const [model, p] of Object.entries(AELA_EXTRA_PRICING)) {
@@ -112,6 +127,9 @@ export class CostTrackerService {
     return false
   }
 
+  /**
+   * 返回成本汇总（扩展：today/month/session/day 维度）
+   */
   summary(): CostSummary {
     const byModel: Record<string, ModelCost> = {}
     const bySession: Record<string, ModelCost> = {}
@@ -136,6 +154,70 @@ export class CostTrackerService {
       totalTokens: this.totalTokens, callCount: this.callCount,
       todayCostUSD: todayCost, todayTokens, monthCostUSD: monthCost, monthTokens, byModel, bySession, byDay,
     }
+  }
+
+  /**
+   * 获取每日成本趋势（最近 N 天）
+   */
+  getDailyTrend(days: number = 30): Array<{ date: string; costUSD: number; tokens: number }> {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const byDay = new Map<string, { costUSD: number; tokens: number }>()
+    for (const r of this.records) {
+      const day = r.timestamp.slice(0, 10)
+      const existing = byDay.get(day) ?? { costUSD: 0, tokens: 0 }
+      existing.costUSD += r.costUSD; existing.tokens += r.totalTokens; byDay.set(day, existing)
+    }
+    const trend: Array<{ date: string; costUSD: number; tokens: number }> = []
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today)
+      d.setDate(d.getDate() - i)
+      trend.push({ date: d.toISOString().slice(0, 10), ...(byDay.get(d.toISOString().slice(0, 10)) ?? { costUSD: 0, tokens: 0 }) })
+    }
+    return trend
+  }
+
+  /**
+   * 检查今日花费是否超过阈值（默认 $5）
+   */
+  isTodayOverBudget(thresholdUSD: number = 5): boolean {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    let todayCost = 0
+    for (const r of this.records) {
+      if (r.timestamp.slice(0, 10) === todayStr) { todayCost += r.costUSD; if (todayCost > thresholdUSD) return true }
+    }
+    return false
+  }
+
+  /**
+   * 导出 CSV（最近 90 天）
+   */
+  exportCSV(): string {
+    const lines = ['timestamp,model,sessionId,agentName,promptTokens,completionTokens,totalTokens,costUSD']
+    const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000
+    for (const r of this.records) {
+      if (new Date(r.timestamp).getTime() < cutoff) continue
+      lines.push([r.timestamp, r.model, r.sessionId, r.agentName, r.promptTokens, r.completionTokens, r.totalTokens, r.costUSD.toFixed(6)].join(','))
+    }
+    return lines.join('\n')
+  }
+
+  /**
+   * 根据模型配置或名称推断上下文窗口大小
+   */
+  static resolveContextSize(model?: Partial<ModelConfig> | null): number {
+    if (!model) return 8192
+    if (model.contextSize && model.contextSize > 0) return model.contextSize
+    if (model.model) return getModelContextWindow(model.model)
+    return 8192
+  }
+
+  /**
+   * 计算动态压缩触发阈值（0.5~0.85）
+   */
+  static computeDynamicThreshold(contextSize: number): number {
+    const safetyMargin = Math.min(contextSize * 0.1, 4096)
+    return Math.max(0.5, Math.min(0.85, 1 - safetyMargin / contextSize))
   }
 
   getRecords(limit?: number): CostRecord[] {
