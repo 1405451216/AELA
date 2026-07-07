@@ -36,7 +36,7 @@ export default defineConfig({
         input: {
           index: resolve('src/main/index.ts')
         },
-        external: ['electron', 'better-sqlite3', 'node:crypto', 'node:fs', 'node:path', 'node:module', 'node:child_process', 'node:url', 'node:os']
+        external: ['electron', 'better-sqlite3', 'node:crypto', 'node:fs', 'node:path', 'node:module', 'node:child_process', 'node:url', 'node:os', 'node-llama-cpp']
       }
     }
   },
@@ -54,7 +54,7 @@ export default defineConfig({
         input: {
           index: resolve('src/preload/index.ts')
         },
-        external: ['electron']
+        external: ['electron', 'node-llama-cpp']
       }
     }
   },

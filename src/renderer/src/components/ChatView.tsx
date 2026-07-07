@@ -21,7 +21,7 @@ import { useStreamEvents } from './chat/useStreamEvents'
 import { useRecommendations } from './chat/Recommendations'
 import { randomUUID } from '../utils'
 import InputBox, { type InputBoxHandle } from './InputBox'
-import { AelaHeroLogo } from '../assets/AelaHeroLogo'
+import { VideoPlayer } from './VideoPlayer'
 
 export default function ChatView() {
   const t = useT()
@@ -429,10 +429,15 @@ export default function ChatView() {
     return (
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 flex items-center justify-center overflow-y-auto px-6 py-8">
-          <div className="w-full max-w-5xl">
-            {/* AELA Hero Logo */}
+          <div className="w-full max-w-6xl">
+            {/* AELA Hero —— 演示视频 */}
             <div className="flex justify-center mb-8">
-              <AelaHeroLogo size={120} />
+              <div className="w-full max-w-3xl aspect-video">
+                <VideoPlayer
+                  fallbackTitle="AELA — AI 驱动的智能编程助手"
+                  defaultMuted={true}
+                />
+              </div>
             </div>
             <InputBox
               ref={inputBoxRef}
