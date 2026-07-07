@@ -52,6 +52,38 @@ export class CostTrackerService {
       },
     })
 
+    const sdkTable = defaultPricingTable()
+    for (const [model, p] of Object.entries(AELA_EXTRA_PRICING)) {
+      const sdkPricing: SDKModelPricing = { model: p.model, provider: p.provider, promptPricePer1M: p.promptPricePer1M, completionPricePer1M: p.completionPricePer1M }
+      sdkTable.set(model, sdkPricing)
+    }
+    const customPricing = this.store.get('customPricing', {})
+    for (const [model, p] of Object.entries(customPricing)) {
+      const sdkPricing: SDKModelPricing = { model: p.model, provider: p.provider, promptPricePer1M: p.promptPricePer1M, completionPricePer1M: p.completionPricePer1M }
+      sdkTable.set(model, sdkPricing)
+    }
+    this.calculator = new PricingCalculator(sdkTable)
+
+    this.budget = budget ?? this.store.get('budget', null)
+    if (budget) this.store.set('budget', budget)
+    this.records = this.store.get('records', [])
+    const totals = this.store.get('totals', { totalCostUSD: 0, totalPromptTokens: 0, totalCompTokens: 0, totalTokens: 0, callCount: 0 })
+    this.totalCostUSD = totals.totalCostUSD
+    this.totalPromptTokens = totals.totalPromptTokens
+    this.totalCompTokens = totals.totalCompTokens
+    this.totalTokens = totals.totalTokens
+    this.callCount = totals.callCount
+  }
+    this.store = new Store<CostStoreSchema>({
+      name: 'aela-cost',
+      defaults: {
+        budget: null,
+        customPricing: {},
+        records: [],
+        totals: { totalCostUSD: 0, totalPromptTokens: 0, totalCompTokens: 0, totalTokens: 0, callCount: 0 },
+      },
+    })
+
     // 使用 SDK defaultPricingTable + AELA 额外模型构建 PricingCalculator
     const sdkTable = defaultPricingTable()
     // 合并 AELA 额外模型
@@ -211,14 +243,47 @@ export class CostTrackerService {
    */
   summary(): CostSummary {
     const byModel: Record<string, ModelCost> = {}
+    const bySession: Record<string, ModelCost> = {}
+    const byDay: Record<string, ModelCost> = {}
+
+    const now = new Date()
+    const todayStr = now.toISOString().slice(0, 10)
+    const monthStr = now.toISOString().slice(0, 7)
+
+    let todayCost = 0
+    let monthCost = 0
+    let todayTokens = 0
+    let monthTokens = 0
 
     for (const r of this.records) {
-      if (!byModel[r.model]) {
-        byModel[r.model] = { costUSD: 0, calls: 0, tokens: 0 }
-      }
+      // by model
+      if (!byModel[r.model]) byModel[r.model] = { costUSD: 0, calls: 0, tokens: 0 }
       byModel[r.model].costUSD += r.costUSD
       byModel[r.model].calls++
       byModel[r.model].tokens += r.totalTokens
+
+      // by session
+      if (!bySession[r.sessionId]) bySession[r.sessionId] = { costUSD: 0, calls: 0, tokens: 0 }
+      bySession[r.sessionId].costUSD += r.costUSD
+      bySession[r.sessionId].calls++
+      bySession[r.sessionId].tokens += r.totalTokens
+
+      // by day
+      const day = r.timestamp.slice(0, 10)
+      if (!byDay[day]) byDay[day] = { costUSD: 0, calls: 0, tokens: 0 }
+      byDay[day].costUSD += r.costUSD
+      byDay[day].calls++
+      byDay[day].tokens += r.totalTokens
+
+      // today/month accumulators
+      if (day === todayStr) {
+        todayCost += r.costUSD
+        todayTokens += r.totalTokens
+      }
+      if (r.timestamp.slice(0, 7) === monthStr) {
+        monthCost += r.costUSD
+        monthTokens += r.totalTokens
+      }
     }
 
     return {
@@ -227,8 +292,78 @@ export class CostTrackerService {
       totalCompTokens: this.totalCompTokens,
       totalTokens: this.totalTokens,
       callCount: this.callCount,
+      todayCostUSD: todayCost,
+      todayTokens,
+      monthCostUSD: monthCost,
+      monthTokens,
       byModel,
+      bySession,
+      byDay,
     }
+  }
+
+  /**
+   * 获取每日成本趋势（最近 N 天）
+   */
+  getDailyTrend(days: number = 30): Array<{ date: string; costUSD: number; tokens: number }> {
+    const trend: Array<{ date: string; costUSD: number; tokens: number }> = []
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const byDay = new Map<string, { costUSD: number; tokens: number }>()
+    for (const r of this.records) {
+      const day = r.timestamp.slice(0, 10)
+      const existing = byDay.get(day) ?? { costUSD: 0, tokens: 0 }
+      existing.costUSD += r.costUSD
+      existing.tokens += r.totalTokens
+      byDay.set(day, existing)
+    }
+
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(today)
+      d.setDate(d.getDate() - i)
+      const key = d.toISOString().slice(0, 10)
+      const entry = byDay.get(key) ?? { costUSD: 0, tokens: 0 }
+      trend.push({ date: key, ...entry })
+    }
+    return trend
+  }
+
+  /**
+   * 检查今日花费是否超过阈值（默认 $5）
+   */
+  isTodayOverBudget(thresholdUSD: number = 5): boolean {
+    const todayStr = new Date().toISOString().slice(0, 10)
+    let todayCost = 0
+    for (const r of this.records) {
+      if (r.timestamp.slice(0, 10) === todayStr) {
+        todayCost += r.costUSD
+        if (todayCost > thresholdUSD) return true
+      }
+    }
+    return false
+  }
+
+  /**
+   * 导出 CSV（最近 90 天）
+   */
+  exportCSV(): string {
+    const lines = ['timestamp,model,sessionId,agentName,promptTokens,completionTokens,totalTokens,costUSD']
+    const cutoff = Date.now() - 90 * 24 * 60 * 60 * 1000
+    for (const r of this.records) {
+      if (new Date(r.timestamp).getTime() < cutoff) continue
+      lines.push([
+        r.timestamp,
+        r.model,
+        r.sessionId,
+        r.agentName,
+        r.promptTokens,
+        r.completionTokens,
+        r.totalTokens,
+        r.costUSD.toFixed(6),
+      ].join(','))
+    }
+    return lines.join('\n')
   }
 
   /**

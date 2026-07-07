@@ -34,7 +34,13 @@ export interface CostSummary {
   totalCompTokens: number
   totalTokens: number
   callCount: number
+  todayCostUSD: number
+  todayTokens: number
+  monthCostUSD: number
+  monthTokens: number
   byModel: Record<string, ModelCost>
+  bySession: Record<string, ModelCost>
+  byDay: Record<string, ModelCost>
 }
 
 export interface CostAnalysisReport {

@@ -80,4 +80,17 @@ export function registerCostHandlers(params: {
       return observabilityService.getAlerts(false)
     })
   })
+
+  // ===== 新增：每日趋势 / 今日超支 / CSV 导出 =====
+  ipcMain.handle(IPC_CHANNELS.COST_DAILY_TREND, async (_, days?: number) => {
+    return wrap(() => costTrackerService.getDailyTrend(days ?? 30))
+  })
+
+  ipcMain.handle(IPC_CHANNELS.COST_TODAY_OVER_BUDGET, async (_, thresholdUSD?: number) => {
+    return wrap(() => costTrackerService.isTodayOverBudget(thresholdUSD ?? 5))
+  })
+
+  ipcMain.handle(IPC_CHANNELS.COST_EXPORT_CSV, async () => {
+    return wrap(() => costTrackerService.exportCSV())
+  })
 }

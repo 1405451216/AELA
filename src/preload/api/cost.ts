@@ -17,6 +17,9 @@ export const costApi = {
   getBudget: (): Promise<BudgetConfig | null> => invoke(IPC_CHANNELS.COST_GET_BUDGET),
   setPricing: (model: string, pricing: ModelPricing): Promise<boolean> => invoke(IPC_CHANNELS.COST_SET_PRICING, model, pricing),
   listPricing: (): Promise<ModelPricing[]> => invoke(IPC_CHANNELS.COST_LIST_PRICING),
+  dailyTrend: (days?: number): Promise<Array<{ date: string; costUSD: number; tokens: number }>> => invoke(IPC_CHANNELS.COST_DAILY_TREND, days),
+  isTodayOverBudget: (thresholdUSD?: number): Promise<boolean> => invoke(IPC_CHANNELS.COST_TODAY_OVER_BUDGET, thresholdUSD),
+  exportCSV: (): Promise<string> => invoke(IPC_CHANNELS.COST_EXPORT_CSV),
 }
 
 export const builtinToolsApi = {
