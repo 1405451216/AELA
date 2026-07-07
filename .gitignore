@@ -44,6 +44,14 @@ Thumbs.db
 .vscode/
 .idea/
 
+# ===== AELA internal (not part of source) =====
+.catpaw/
+.codebuddy/
+.github/
+.husky/
+AELA_修复报告.md
+AELA_深度评估报告.md
+
 # ===== Misc =====
 npm-debug.log*
 yarn-error.log*
