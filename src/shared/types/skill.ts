@@ -58,3 +58,29 @@ export interface SkillScanResult {
   dedupConflicts: SkillDedupConflict[]
   lastScanAt: string
 }
+
+/** Skill 市场注册表项 */
+export interface SkillRegistryEntry {
+  id: string
+  name: string
+  description: string
+  author: string
+  version: string
+  tarballUrl: string
+  permissions: {
+    files?: 'read' | 'write' | 'none'
+    terminal?: 'exec' | 'none'
+    network?: string
+  }
+  downloads?: number
+  rating?: number
+}
+
+/** 已安装 skill 的市场信息 */
+export interface InstalledSkillInfo {
+  id: string
+  name: string
+  version: string
+  path: string
+  permissions: SkillRegistryEntry['permissions']
+}

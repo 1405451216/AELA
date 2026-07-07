@@ -51,6 +51,7 @@ import { registerModelConfigHandlers } from './handlers/modelConfig'
 import { registerSessionHandlers } from './handlers/session'
 import { registerWorkspaceHandlers, setSyncToolManager } from './handlers/workspace'
 import { registerAgentHandlers } from './handlers/agent'
+import { SkillRegistryService } from '../services/SkillRegistryService'
 import { registerSkillHandlers } from './handlers/skill'
 import { registerAutomationHandlers } from './handlers/automation'
 import { registerOrchestrationHandlers } from './handlers/orchestration'
@@ -86,7 +87,7 @@ import { registerAdvancedHandlers } from './handlers/advanced'
 import { registerMultiAgentHandlers } from './handlers/multiAgent'
 import { registerSyncHandlers } from './handlers/sync'
 
-export function registerIPC(container: ServiceContainer): void {
+export async function registerIPC(container: ServiceContainer): Promise<void> {
   const configStore = container.get<ConfigStore>(SERVICE_TOKENS.CONFIG_STORE)
   const sessionStore = container.get<SessionStore>(SERVICE_TOKENS.SESSION_STORE)
   const agentService = container.get<AgentService>(SERVICE_TOKENS.AGENT_SERVICE)
@@ -153,7 +154,9 @@ export function registerIPC(container: ServiceContainer): void {
   // registerSkill needs the scanner — scan once at startup
   const skillScanner = getSkillScanner()
   skillScanner.scanAll().catch(err => console.error('[SkillScanner] Initial scan failed:', err))
-  registerSkillHandlers({ skillScanner })
+  const { SkillRegistryService } = await import('../services/SkillRegistryService')
+  const skillRegistry = new SkillRegistryService()
+  registerSkillHandlers({ skillScanner, skillRegistry })
 
   registerAutomationHandlers({ configStore, sessionStore, agentService, automationStore })
 

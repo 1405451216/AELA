@@ -34,8 +34,7 @@ export default function DeveloperPanel({ open, onClose }: DeveloperPanelProps) {
 
   const refreshLogs = useCallback(async () => {
     try {
-      const entries = await window.aela.ipcMonitor.getEntries()
-      setLogs(entries)
+      const entries = await window.aela.ipcMonitor.getEntries() as IpcLogEntry[]
     } catch {
       // ignore
     }
@@ -157,7 +156,7 @@ function IpcLogTab({ logs }: { logs: IpcLogEntry[] }) {
                   <td className="px-2 py-1 text-[#858585]">{log.seq}</td>
                   <td className="px-2 py-1 text-[#9cdcfe]">{log.channel}</td>
                   <td className={`px-2 py-1 ${
-                    log.duration > IpcMonitorService.SLOW_THRESHOLD ? 'text-[#dcdcaa]' : 'text-[#b5cea8]'
+                    log.duration > SLOW_THRESHOLD ? 'text-[#dcdcaa]' : 'text-[#b5cea8]'
                   }`}>
                     {log.duration.toFixed(1)}ms
                   </td>

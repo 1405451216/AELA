@@ -10,7 +10,7 @@ export type ViewType =
   | 'securityPreset' | 'sessionManager' | 'adaptiveLearning'
   | 'screenshotAnalysis' | 'resilience'
   | 'checkpoints' | 'plugins' | 'diagnostics'
-  | 'taskBoard' | 'multiAgent'
+  | 'taskBoard' | 'multiAgent' | 'skillMarket'
 
 interface ViewState {
   currentView: ViewType

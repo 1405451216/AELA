@@ -9,6 +9,7 @@ export const dict: Record<Lang, Record<string, string>> = {
     // Sidebar
     'sidebar.newTask': '新建任务',
     'sidebar.skills': '技能',
+    'sidebar.skillMarket': 'Skill 市场',
     'sidebar.automation': '自动化',
     'sidebar.orchestration': '编排',
     'sidebar.settings': '设置',
@@ -702,6 +703,7 @@ export const dict: Record<Lang, Record<string, string>> = {
     // Sidebar
     'sidebar.newTask': 'New Task',
     'sidebar.skills': 'Skills',
+    'sidebar.skillMarket': 'Skill Market',
     'sidebar.automation': 'Automation',
     'sidebar.orchestration': 'Workflow',
     'sidebar.settings': 'Settings',

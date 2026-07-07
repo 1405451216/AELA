@@ -300,6 +300,12 @@ export interface AELAApi {
     clear: () => Promise<boolean>
     onLog: (listener: (entry: unknown) => void) => () => void
   }
+  skillMarket: {
+    list: () => Promise<{ registry: any[]; installed: any[]; offline: boolean }>
+    install: (entry: any) => Promise<{ success: boolean; skillId: string }>
+    uninstall: (skillId: string) => Promise<{ success: boolean; skillId: string }>
+    installed: () => Promise<any[]>
+  }
   contextWindow: {
     getConfig: () => Promise<ContextWindowConfig>
     setConfig: (config: Partial<ContextWindowConfig>) => Promise<boolean>

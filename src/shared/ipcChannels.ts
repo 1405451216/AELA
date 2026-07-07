@@ -161,6 +161,19 @@ export const IPC_CHANNELS = {
   COST_GET_BUDGET: 'cost:get-budget',
   COST_SET_PRICING: 'cost:set-pricing',
   COST_LIST_PRICING: 'cost:list-pricing',
+  COST_DAILY_TREND: 'cost:daily-trend',
+  COST_TODAY_OVER_BUDGET: 'cost:today-over-budget',
+  COST_EXPORT_CSV: 'cost:export-csv',
+
+  // ===== 开发者面板 =====
+  IPC_MONITOR_GET: 'ipc-monitor:get-entries',
+  IPC_MONITOR_CLEAR: 'ipc-monitor:clear',
+
+  // ===== Skill 市场 =====
+  SKILL_MARKET_LIST: 'skill-market:list',
+  SKILL_MARKET_INSTALL: 'skill-market:install',
+  SKILL_MARKET_UNINSTALL: 'skill-market:uninstall',
+  SKILL_MARKET_INSTALLED: 'skill-market:installed',
 
   // Context Window 上下文窗口管理
   CONTEXT_WINDOW_GET_CONFIG: 'context-window:get-config',
