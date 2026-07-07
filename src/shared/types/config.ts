@@ -28,6 +28,7 @@ export interface AppConfig {
   includeClaudeMd: boolean
   promptVariant: string
   slashCommands: SlashCommand[]
+  completedOnboarding: boolean
 }
 
 export interface PromptVariantInfo {

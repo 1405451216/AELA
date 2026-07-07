@@ -28,7 +28,8 @@ const DEFAULT_CONFIG: AppConfig = {
   includeAgentsMd: false,
   includeClaudeMd: false,
   promptVariant: 'default',
-  slashCommands: []
+  slashCommands: [],
+  completedOnboarding: false,
 }
 
 export class ConfigStore {

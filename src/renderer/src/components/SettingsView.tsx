@@ -324,6 +324,23 @@ export default function SettingsView() {
             >
               {t('settings.save')}
             </button>
+
+            {/* 复位引导 */}
+            <div className="mt-8 pt-6 border-t border-border">
+              <button
+                onClick={async () => {
+                  try {
+                    const updated = await window.aela.config.set({ completedOnboarding: false })
+                    setAppConfig(updated)
+                  } catch (err: unknown) {
+                    setError(`复位失败: ${err instanceof Error ? err.message : String(err)}`)
+                  }
+                }}
+                className="px-4 py-2 text-sm text-text-muted hover:text-text-secondary border border-border rounded-lg hover:border-accent transition-colors"
+              >
+                ↺ 复位引导（下次启动时重新显示）
+              </button>
+            </div>
           </div>
         )}
 

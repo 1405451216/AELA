@@ -195,6 +195,9 @@ export interface AELAApi {
     set: (partial: Partial<AppConfig>) => Promise<AppConfig>
     isApiKeyStorageSecure: () => Promise<boolean>
   }
+  dialog: {
+    showOpenDialog: (options: { properties: string[]; title?: string }) => Promise<string[] | null>
+  }
   orchestration: {
     run: (config: OrchestrationConfig) => Promise<void>
     stop: (runId: string) => Promise<boolean>

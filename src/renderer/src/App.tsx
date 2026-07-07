@@ -1,5 +1,6 @@
 import { useEffect, Suspense, useState, lazy, useCallback, useRef } from 'react'
 import { useViewStore } from './stores'
+import { useConfigStore } from './stores/configStore'
 import { loadInitialData } from './stores/loadInitial'
 import { getViewComponent } from './views'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -7,6 +8,7 @@ import Dialog from './components/Dialog'
 import Sidebar from './components/Sidebar'
 import ChatView from './components/ChatView'
 import CommandPalette from './components/CommandPalette'
+import OnboardingWizard from './components/OnboardingWizard'
 import { useKeyboardShortcuts } from './commands/useKeyboardShortcuts'
 
 // 工作台面板懒加载（含 PreviewView + TerminalEnhancedView）
@@ -28,6 +30,8 @@ export default function App() {
   const currentView = useViewStore((s) => s.currentView)
   const error = useViewStore((s) => s.error)
   const setError = useViewStore((s) => s.setError)
+  const appConfig = useConfigStore((s) => s.appConfig)
+  const setAppConfig = useConfigStore((s) => s.setAppConfig)
   const [workbenchOpen, setWorkbenchOpen] = useState(false)
   const [workbenchWidth, setWorkbenchWidth] = useState(WORKBENCH_DEFAULT_WIDTH)
   const [isDragging, setIsDragging] = useState(false)
@@ -70,6 +74,21 @@ export default function App() {
   useEffect(() => {
     loadInitialData()
   }, [])
+
+  // 完成 Onboarding 引导
+  const handleOnboardingComplete = useCallback(async () => {
+    try {
+      const updated = await window.aela.config.set({ completedOnboarding: true })
+      setAppConfig(updated)
+    } catch {
+      // 静默处理
+    }
+  }, [setAppConfig])
+
+  // 未走完引导流程时渲染 Onboarding Wizard
+  if (appConfig && !appConfig.completedOnboarding) {
+    return <OnboardingWizard onComplete={handleOnboardingComplete} />
+  }
 
   return (
     <>
