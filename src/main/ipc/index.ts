@@ -52,6 +52,7 @@ import { registerSessionHandlers } from './handlers/session'
 import { registerWorkspaceHandlers, setSyncToolManager } from './handlers/workspace'
 import { registerAgentHandlers } from './handlers/agent'
 import { SkillRegistryService } from '../services/SkillRegistryService'
+import { registerLocalEngineHandlers } from './handlers/localEngine'
 import { registerSkillHandlers } from './handlers/skill'
 import { registerAutomationHandlers } from './handlers/automation'
 import { registerOrchestrationHandlers } from './handlers/orchestration'
@@ -238,4 +239,7 @@ export async function registerIPC(container: ServiceContainer): Promise<void> {
 
   // ===== Remote Workspace Sync =====
   registerSyncHandlers(container)
+
+  // ===== Local Engine (Ollama / llama.cpp) =====
+  registerLocalEngineHandlers()
 }

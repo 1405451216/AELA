@@ -175,6 +175,13 @@ export const IPC_CHANNELS = {
   SKILL_MARKET_UNINSTALL: 'skill-market:uninstall',
   SKILL_MARKET_INSTALLED: 'skill-market:installed',
 
+  // ===== 本地模型 =====
+  LOCAL_ENGINE_STATUS: 'local-engine:status',
+  LOCAL_ENGINE_LIST: 'local-engine:list',
+  LOCAL_ENGINE_INIT: 'local-engine:init',
+  LOCAL_ENGINE_CHAT: 'local-engine:chat',
+  LOCAL_ENGINE_HEALTH: 'local-engine:health',
+
   // Context Window 上下文窗口管理
   CONTEXT_WINDOW_GET_CONFIG: 'context-window:get-config',
   CONTEXT_WINDOW_SET_CONFIG: 'context-window:set-config',

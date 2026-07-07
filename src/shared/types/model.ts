@@ -1,3 +1,5 @@
+export type ModelEngine = 'api' | 'ollama' | 'llamacpp'
+
 export interface ModelConfig {
   id: string
   name: string
@@ -11,6 +13,10 @@ export interface ModelConfig {
   contextSize?: number
   isDefault?: boolean
   createdAt: string
+  /** 推理引擎类型：api=云端, ollama=Ollama, llamacpp=本地GGUF */
+  engine?: ModelEngine
+  /** 本地模型文件路径（llamacpp引擎专用） */
+  modelPath?: string
 }
 
 export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
