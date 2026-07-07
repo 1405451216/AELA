@@ -321,9 +321,6 @@ export const IPC_CHANNELS = {
   // ===== [升级 3] 可观测性增强 =====
   METRICS_TREND: 'metrics:trend',
   COST_ANALYSIS: 'cost:analysis',
-  COST_DAILY_TREND: 'cost:daily-trend',
-  COST_TODAY_OVER_BUDGET: 'cost:today-over-budget',
-  COST_EXPORT_CSV: 'cost:export-csv',
   ANOMALY_LIST: 'anomaly:list',
   ANOMALY_ACKNOWLEDGE: 'anomaly:acknowledge',
   ANOMALY_CHECK: 'anomaly:check',
