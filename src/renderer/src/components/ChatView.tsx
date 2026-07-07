@@ -60,6 +60,7 @@ export default function ChatView() {
   } = useStreamEvents()
 
   const [input, setInput] = useState('')
+  const [pendingImages, setPendingImages] = useState<string[]>([])
   const [selectedMode, setSelectedMode] = useState<string>('code')
   const [showSkillPicker, setShowSkillPicker] = useState(false)
   const [activeSkillIds, setActiveSkillIds] = useState<string[]>([])
@@ -306,9 +307,11 @@ export default function ChatView() {
       sessionId: session.id,
       role: 'user',
       content: input.trim(),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      image: pendingImages.length > 0 ? pendingImages[0] : undefined,
     }
     addMessage(userMessage)
+    setPendingImages([])
 
     const userInput = input.trim()
     setInput('')
@@ -457,6 +460,7 @@ export default function ChatView() {
               permissionLevel={permissionLevel}
               onPermissionChange={setPermissionLevel}
               contextInfo={contextInfo}
+              onImagesChange={setPendingImages}
             />
           </div>
         </div>

@@ -133,7 +133,16 @@ function MessageBubbleInner({ message, isStreaming }: Props) {
           }`}
         >
           {isUser ? (
-            <div className="whitespace-pre-wrap">{safeContent}</div>
+            <div className="whitespace-pre-wrap">
+              {message.image && (
+                <img
+                  src={message.image}
+                  alt="用户图片"
+                  className="max-w-[320px] h-auto rounded-lg mb-2 block"
+                />
+              )}
+              {safeContent}
+            </div>
           ) : (
             <div className="markdown-body">
               {blocks.map((block) => (

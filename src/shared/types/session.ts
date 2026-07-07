@@ -31,6 +31,8 @@ export interface ChatMessage {
   toolResult?: ToolResultInfo
   metrics?: MessageMetrics
   createdAt: string
+  /** base64 dataURL for attached image (image/* only) */
+  image?: string
 }
 
 export interface ToolCallInfo {

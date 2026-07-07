@@ -82,6 +82,8 @@ export interface InputBoxProps {
   contextInfo: SessionContextInfo | null
   // @-mention 上下文变化回调（可选，父组件用于获取引用的上下文）
   onMentionContextChange?: (contextText: string) => void
+  /** 待发送图片变更回调 */
+  onImagesChange?: (images: string[]) => void
 }
 
 export interface InputBoxHandle {
@@ -114,6 +116,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox(pro
   const [cursorPos, setCursorPos] = useState(0)
   const [mentionItems, setMentionItems] = useState<MentionItem[]>([])
   const [interimText, setInterimText] = useState('')
+  const [pendingImages, setPendingImages] = useState<string[]>([])
 
   const voiceInputEnabled = useVoiceStore(s => s.voiceInputEnabled)
   const voiceLanguage = useVoiceStore(s => s.voiceLanguage)
@@ -137,13 +140,43 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox(pro
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey && sendOnEnter) {
-      // 如果 mention 下拉可见，不触发发送（由 MentionDropdown 处理 Enter）
       const hasMention = detectMentionAtCursor(input, cursorPos)
       if (hasMention) return
       e.preventDefault()
       onSend()
     }
   }
+
+  // 处理粘贴事件（拦截图片）
+  const handlePaste = (e: ClipboardEvent) => {
+    if (e.clipboardData && e.clipboardData.items) {
+      const items = Array.from(e.clipboardData.items)
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          e.preventDefault()
+          const file = item.getAsFile()
+          if (file) {
+            const reader = new FileReader()
+            reader.onload = (ev) => {
+              const dataUrl = ev.target?.result as string
+              setPendingImages(prev => [...prev, dataUrl])
+            }
+            reader.readAsDataURL(file)
+          }
+          break
+        }
+      }
+    }
+  }
+
+  // 监听 paste 事件
+  useEffect(() => {
+    const textarea = textareaRef.current
+    if (textarea) {
+      textarea.addEventListener('paste', handlePaste)
+      return () => textarea.removeEventListener('paste', handlePaste)
+    }
+  }, [])
 
   // 检测当前光标是否在 @-mention 输入中
   const detectMentionAtCursor = (text: string, pos: number): boolean => {
@@ -298,6 +331,28 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(function InputBox(pro
                 className="hover:text-white ml-0.5"
               >✕</button>
             </span>
+          ))}
+        </div>
+      )}
+
+      {/* 待发送图片预览 */}
+      {pendingImages.length > 0 && (
+        <div className="flex items-center gap-2 px-4 pt-3 flex-wrap">
+          <span className="text-text-muted text-xs shrink-0">📷 待发送图片</span>
+          {pendingImages.map((img, idx) => (
+            <div key={idx} className="relative inline-block">
+              <img
+                src={img}
+                alt={`待发送 ${idx + 1}`}
+                className="w-16 h-16 rounded-lg object-cover border border-border"
+              />
+              <button
+                onClick={() => setPendingImages(prev => prev.filter((_, i) => i !== idx))}
+                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center text-[10px]"
+              >
+                ×
+              </button>
+            </div>
           ))}
         </div>
       )}
