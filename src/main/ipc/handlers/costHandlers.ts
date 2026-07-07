@@ -80,4 +80,18 @@ export function registerCostHandlers(params: {
       return observabilityService.getAlerts(false)
     })
   })
+
+  // ===== IPC 监控（开发者面板）=====
+  ipcMain.handle('ipc-monitor:get-entries', async () => {
+    const { getIpcMonitor } = await import('../../utils/ipcHelpers')
+    const monitor = getIpcMonitor()
+    return monitor ? monitor.getEntries() : []
+  })
+
+  ipcMain.handle('ipc-monitor:clear', async () => {
+    const { getIpcMonitor } = await import('../../utils/ipcHelpers')
+    const monitor = getIpcMonitor()
+    if (monitor) monitor.clear()
+    return true
+  })
 }

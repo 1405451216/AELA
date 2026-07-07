@@ -93,6 +93,15 @@ app.whenReady().then(async () => {
   // ===== 注册 IPC 处理器 =====
   const t4 = performance.now()
   log('registering IPC handlers...')
+
+  // dev 模式下启用 IPC 监控（必须在 registerIPC 之前注入）
+  let ipcMonitor: import('./services/IpcMonitorService').IpcMonitorService | null = null
+  if (!app.isPackaged) {
+    ipcMonitor = new (await import('./services/IpcMonitorService')).IpcMonitorService(100)
+    ;(await import('./utils/ipcHelpers')).setIpcMonitor(ipcMonitor)
+    log('[dev] IPC monitor enabled')
+  }
+
   registerIPC(container)
   const t5 = performance.now()
   log(`IPC handlers registered in ${(t5 - t4).toFixed(0)}ms`)
@@ -106,6 +115,11 @@ app.whenReady().then(async () => {
   const t6 = performance.now()
   log('calling createWindow...')
   windowManager.create()
+  // dev 模式下将 IPC monitor 绑定到主窗口（推送日志）
+  if (ipcMonitor) {
+    const win = windowManager.get()
+    if (win) ipcMonitor.attachTo(win.webContents)
+  }
   const t7 = performance.now()
   log(`createWindow returned in ${(t7 - t6).toFixed(0)}ms`)
 

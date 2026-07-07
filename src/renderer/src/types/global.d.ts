@@ -291,6 +291,14 @@ export interface AELAApi {
     getBudget: () => Promise<BudgetConfig | null>
     setPricing: (model: string, pricing: ModelPricing) => Promise<boolean>
     listPricing: () => Promise<ModelPricing[]>
+    dailyTrend: (days?: number) => Promise<Array<{ date: string; costUSD: number; tokens: number }>>
+    isTodayOverBudget: (thresholdUSD?: number) => Promise<boolean>
+    exportCSV: () => Promise<string>
+  }
+  ipcMonitor: {
+    getEntries: () => Promise<unknown[]>
+    clear: () => Promise<boolean>
+    onLog: (listener: (entry: unknown) => void) => () => void
   }
   contextWindow: {
     getConfig: () => Promise<ContextWindowConfig>

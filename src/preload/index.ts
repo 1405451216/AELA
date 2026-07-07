@@ -50,6 +50,7 @@ import { sdkPhase4Api } from './api/sdkPhase4'
 import { checkpointApi, inlineCompletionApi, lspApi, pluginApi, embeddingApi } from './api/advanced'
 import { taskBoardApi, agentBusApi, supervisorSessionApi } from './api/multiAgent'
 import { syncApi } from './api/sync'
+import { ipcMonitorApi } from './api/ipcMonitor'
 
 // ===== 暴露给渲染进程的 API =====
 const api = {
@@ -122,6 +123,7 @@ const api = {
   agentBus: agentBusApi,
   supervisorSession: supervisorSessionApi,
   sync: syncApi,
+  ipcMonitor: ipcMonitorApi,
 }
 
 // 暴露到 window 对象

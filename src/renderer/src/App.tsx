@@ -9,6 +9,7 @@ import Sidebar from './components/Sidebar'
 import ChatView from './components/ChatView'
 import CommandPalette from './components/CommandPalette'
 import OnboardingWizard from './components/OnboardingWizard'
+import DeveloperPanel from './components/DeveloperPanel'
 import { useKeyboardShortcuts } from './commands/useKeyboardShortcuts'
 
 // 工作台面板懒加载（含 PreviewView + TerminalEnhancedView）
@@ -39,6 +40,19 @@ export default function App() {
 
   // 键盘快捷键 + 命令面板
   const { paletteOpen, setPaletteOpen } = useKeyboardShortcuts()
+  const [devPanelOpen, setDevPanelOpen] = useState(false)
+
+  // Ctrl+Shift+D — 开发者面板
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault()
+        setDevPanelOpen(p => !p)
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
   // 拖拽分割条逻辑
   const handleDragStart = useCallback((e: React.MouseEvent) => {
@@ -179,6 +193,7 @@ export default function App() {
     </ErrorBoundary>
     <Dialog />
     <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+    <DeveloperPanel open={devPanelOpen} onClose={() => setDevPanelOpen(false)} />
     </>
   )
 }
