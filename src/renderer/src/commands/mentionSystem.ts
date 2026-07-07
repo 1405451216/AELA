@@ -28,14 +28,35 @@ export interface MentionContext {
 
 // ===== 引用解析器 =====
 
+export interface FileMention {
+  path: string
+  startLine?: number
+  endLine?: number
+}
+
+/**
+ * 解析 @file 引用，支持行范围语法：
+ *   @file:path/to/file
+ *   @file:path/to/file:10
+ *   @file:path/to/file:10-20
+ */
+export function parseFileMention(ref: string): FileMention | null {
+  const m = ref.match(/^(.+?)(?::(\d+)(?:-(\d+))?)?$/)
+  if (!m) return null
+  const path = m[1]
+  const startLine = m[2] ? parseInt(m[2], 10) : undefined
+  const endLine = m[3] ? parseInt(m[3], 10) : undefined
+  return { path, startLine, endLine }
+}
+
 /**
  * 从输入文本中提取已完成的 @-mention 引用
- * 支持格式：@file:path/to/file @memory:keyword @web:https://...
+ * 支持格式：@file:path/to/file[:start-end] @memory:keyword @web:https://...
  */
 export function extractMentions(text: string): string[] {
   const mentions: string[] = []
-  // 匹配 @file: @memory: @web: 前缀后跟非空白字符
-  const regex = /@(file|memory|web):(\S+)/g
+  // 匹配 @file: @memory: @web:，文件引用可带 :数字-数字 行范围
+  const regex = /@(file|memory|web):([^\s@]+(?::\d+(?:-\d+)?)?)/g
   let match: RegExpExecArray | null
   while ((match = regex.exec(text)) !== null) {
     mentions.push(`@${match[1]}:${match[2]}`)

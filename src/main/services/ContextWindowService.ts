@@ -12,6 +12,8 @@ import {
 } from '@agentprimordia/sdk'
 import type { Provider, Message } from '@agentprimordia/sdk'
 import type { ContextWindowConfig, ContextCompressConfig } from '@shared/types'
+import { getModelContextWindow } from '@shared/types/model'
+import type { ModelConfig } from '@shared/types/model'
 
 // ===== 上下文窗口策略接口（保持 AELA 内部兼容）=====
 
@@ -193,6 +195,44 @@ export class ContextWindowService {
    */
   estimateTokenCount(text: string): number {
     return sdkEstimateTokenCount(text)
+  }
+
+  /**
+   * 获取模型的上下文窗口大小（token 数）
+   * 由调用方传入，服务自身不依赖 ConfigStore（保持解耦）
+   */
+  static resolveContextSize(model?: { contextSize?: number; model?: string } | null): number {
+    if (!model) return 8192
+    if (model.contextSize && model.contextSize > 0) return model.contextSize
+    if (model.model) return getModelContextWindow(model.model)
+    return 8192
+  }
+
+  /**
+   * 计算动态压缩触发阈值（0.5~0.85）
+   * @param contextSize 当前模型上下文窗口大小（token 数）
+   */
+  static computeDynamicThreshold(contextSize: number): number {
+    const safetyMargin = Math.min(contextSize * 0.1, 4096)
+    const raw = 1 - safetyMargin / contextSize
+    return Math.max(0.5, Math.min(0.85, raw))
+  }
+
+  /**
+   * 实例方法版本，需配合 setModelContext 使用（向后兼容）
+   */
+  private currentModelContextSize = 8192
+
+  setModelContextSize(size: number): void {
+    this.currentModelContextSize = size
+  }
+
+  getModelContextSize(): number {
+    return this.currentModelContextSize
+  }
+
+  computeDynamicThresholdForCurrent(): number {
+    return ContextWindowService.computeDynamicThreshold(this.currentModelContextSize)
   }
 
   /**

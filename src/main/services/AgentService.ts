@@ -23,7 +23,7 @@ import type { ConfigStore } from './ConfigStore'
 import type { ObservabilityService } from './ObservabilityService'
 import type { MemoryService } from './MemoryService'
 import type { CostTrackerService } from './CostTrackerService'
-import type { ContextWindowService } from './ContextWindowService'
+import { ContextWindowService } from './ContextWindowService'
 import type { HITLService } from './HITLService'
 import type { AuditService } from './AuditService'
 import type { ToolLearningService } from './ToolLearningService'
@@ -378,9 +378,15 @@ export class AgentService {
           sessionId: params.sessionId, promptTokens, conversationTokens, totalTokens,
           budget: budget.budget, usage: budget.usage,
         })
-        if (budget.usage > 0.8) {
+        const sessionId = params.sessionId
+        const modelCfg = sessionId
+          ? this.configStore.getModel(this.sessionStore.getSession(sessionId)?.modelConfigId ?? '')
+          : null
+        const ctxSize = ContextWindowService.resolveContextSize(modelCfg)
+        const dynamicThreshold = ContextWindowService.computeDynamicThreshold(ctxSize)
+        if (budget.usage > dynamicThreshold) {
           effectiveMaxMessages = Math.max(10, Math.floor(appConfig.maxMessages * 0.6))
-          console.warn(`[AgentService] 上下文使用率 ${Math.round(budget.usage * 100)}%，压缩 maxMessages → ${effectiveMaxMessages}`)
+          console.warn(`[AgentService] 上下文使用率 ${Math.round(budget.usage * 100)}%，动态阈值 ${Math.round(dynamicThreshold * 100)}%（模型 ${modelCfg?.model ?? 'default'}，窗口 ${ctxSize}），压缩 maxMessages → ${effectiveMaxMessages}`)
         }
       } catch (err) {
         console.error('[AgentService] ContextWindow 测量失败:', err)

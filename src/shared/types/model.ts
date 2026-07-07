@@ -7,6 +7,8 @@ export interface ModelConfig {
   model: string
   temperature?: number
   maxTokens?: number
+  /** 用户可覆盖的上下文窗口大小（字符数），未设置时按模型名称自动推断 */
+  contextSize?: number
   isDefault?: boolean
   createdAt: string
 }
