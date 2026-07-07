@@ -16,6 +16,7 @@ import DiffCard from './chat/DiffCard'
 import HitlPanel from './chat/HitlPanel'
 import TerminalPanel from './chat/TerminalPanel'
 import ContextBar from './chat/ContextBar'
+import EscInterruptToast from './chat/EscInterruptToast'
 import { useStreamEvents } from './chat/useStreamEvents'
 import { useRecommendations } from './chat/Recommendations'
 import { randomUUID } from '../utils'
@@ -65,6 +66,11 @@ export default function ChatView() {
   const [showDiffPanel, setShowDiffPanel] = useState(false)
   const [showTerminal, setShowTerminal] = useState(false)
   const [contextInfo, setContextInfo] = useState<SessionContextInfo | null>(null)
+  /** Esc 中断状态：连续按 Esc 的次数 */
+  const [escToast, setEscToast] = useState<{ show: boolean; progress: number }>({ show: false, progress: 0 })
+  const escCountRef = useRef(0)
+  const escTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const escIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const diffStoreDiffs = useDiffStore(s => s.diffs)
   const acceptDiffStoreDiff = useDiffStore(s => s.acceptDiff)
@@ -88,6 +94,65 @@ export default function ChatView() {
   // 流式 IPC 订阅句柄（component unmount 或新一轮 runStream 时清理，防止监听器泄漏）
   const streamUnsubRef = useRef<(() => void) | null>(null)
   const hitlUnsubRef = useRef<(() => void) | null>(null)
+
+  // —— Esc 双按中断逻辑 ——
+  useEffect(() => {
+    if (!isStreaming) return
+
+    const ESC_TIMEOUT = 2000
+    let progressInterval: ReturnType<typeof setInterval> | null = null
+
+    const cleanup = () => {
+      if (escTimerRef.current) { clearTimeout(escTimerRef.current); escTimerRef.current = null }
+      if (escIntervalRef.current) { clearInterval(escIntervalRef.current); escIntervalRef.current = null }
+    }
+
+    const startProgress = () => {
+      const start = performance.now()
+      escIntervalRef.current = setInterval(() => {
+        const elapsed = performance.now() - start
+        const p = 1 - Math.min(elapsed / ESC_TIMEOUT, 1)
+        setEscToast({ show: true, progress: p })
+      }, 50)
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 面板（dialog/panel）打开时走原有 Esc 链路，不进入中断分支
+      if (e.key !== 'Escape') return
+      const openPanels = document.querySelectorAll('[role="dialog"], [data-panel-open="true"]').length > 0
+      if (openPanels) return
+      
+      e.preventDefault()
+      e.stopPropagation()
+
+      if (escCountRef.current === 0) {
+        // 第一次 Esc：显示提示
+        escCountRef.current = 1
+        setEscToast({ show: true, progress: 1 })
+        startProgress()
+        escTimerRef.current = setTimeout(() => {
+          escCountRef.current = 0
+          setEscToast({ show: false, progress: 0 })
+          cleanup()
+        }, ESC_TIMEOUT)
+      } else {
+        // 第二次 Esc：立即中断
+        escCountRef.current = 0
+        cleanup()
+        setEscToast({ show: false, progress: 0 })
+        handleStop()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown, true) // capture 阶段拦截
+
+    return () => {
+      cleanup()
+      window.removeEventListener('keydown', handleKeyDown, true)
+      escCountRef.current = 0
+      setEscToast({ show: false, progress: 0 })
+    }
+  }, [isStreaming])
 
   useEffect(() => {
     return () => {
@@ -414,6 +479,8 @@ export default function ChatView() {
         onToggleDiffPanel={() => setShowDiffPanel(!showDiffPanel)}
         onToggleTerminal={() => setShowTerminal(!showTerminal)}
       />
+
+      <EscInterruptToast show={escToast.show} progress={escToast.progress} />
 
       <ContextBar
         activeFile={contextStore.activeFile}
