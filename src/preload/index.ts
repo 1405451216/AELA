@@ -32,6 +32,7 @@ import { taskBoardApi, agentBusApi, supervisorSessionApi } from './api/multiAgen
 import { syncApi } from './api/sync'
 import { ipcMonitorApi } from './api/ipcMonitor'
 import { skillMarketApi } from './api/skillMarket'
+import { dialogApi } from './api/dialog'
 
 const api = {
   model: modelApi,
@@ -105,6 +106,7 @@ const api = {
   sync: syncApi,
   ipcMonitor: ipcMonitorApi,
   skillMarket: skillMarketApi,
+  dialog: dialogApi,
 }
 
 contextBridge.exposeInMainWorld('aela', api)

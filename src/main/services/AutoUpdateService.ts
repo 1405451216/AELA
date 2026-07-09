@@ -5,13 +5,13 @@
 
 import { app, dialog } from 'electron'
 import type { BrowserWindow } from 'electron'
-import electronUpdater from 'electron-updater'
 import type { UpdateInfo } from 'electron-updater'
-import log from 'electron-log'
+import type ElectronLog from 'electron-log'
+import { lazyRequire } from '../utils/nativeRequire'
 
 // electron-updater 类型定义与运行时 API 不完全匹配，使用显式接口
 interface AutoUpdaterExt {
-  logger: typeof log
+  logger: typeof ElectronLog
   autoDownload: boolean
   autoInstallOnAppQuit: boolean
   on(event: 'checking-for-update', listener: () => void): void
@@ -24,9 +24,26 @@ interface AutoUpdaterExt {
   quitAndInstall(): void
 }
 
-const autoUpdater: AutoUpdaterExt = electronUpdater.autoUpdater as unknown as AutoUpdaterExt
+// 延迟加载 CJS 模块（ESM + asar 环境兼容）
+let _autoUpdater: AutoUpdaterExt | null = null
+function getAutoUpdater(): AutoUpdaterExt {
+  if (!_autoUpdater) {
+    const electronUpdater = lazyRequire<typeof import('electron-updater')>('electron-updater')
+    _autoUpdater = electronUpdater.autoUpdater as unknown as AutoUpdaterExt
+  }
+  return _autoUpdater
+}
+
+let _log: typeof ElectronLog | null = null
+function getLog(): typeof ElectronLog {
+  if (!_log) {
+    _log = lazyRequire<typeof ElectronLog>('electron-log')
+  }
+  return _log
+}
 
 // 配置日志级别
+const log = getLog()
 log.transports.file.level = 'info'
 log.transports.console.level = !app.isPackaged ? 'debug' : 'info'
 
@@ -54,30 +71,31 @@ export class AutoUpdateService {
     if (this.setupDone) return
     this.setupDone = true
 
-    autoUpdater.logger = log
-    autoUpdater.autoDownload = !process.env.AELA_SKIP_AUTO_UPDATE
-    autoUpdater.autoInstallOnAppQuit = true
+    const updater = getAutoUpdater()
+    updater.logger = log
+    updater.autoDownload = !process.env.AELA_SKIP_AUTO_UPDATE
+    updater.autoInstallOnAppQuit = true
 
     // 检查到新版本
-    autoUpdater.on('checking-for-update', () => {
+    updater.on('checking-for-update', () => {
       this.opts.log('[AutoUpdate] Checking for update...')
       this.notifyRenderer('checking-for-update', null)
     })
 
     // 有可用更新
-    autoUpdater.on('update-available', (info: UpdateInfo) => {
+    updater.on('update-available', (info: UpdateInfo) => {
       this.opts.log(`[AutoUpdate] Update available: ${info.version}`)
       this.notifyRenderer('update-available', { version: info.version, releaseNotes: info.releaseNotes })
     })
 
     // 当前版本是最新的
-    autoUpdater.on('update-not-available', (info: UpdateInfo) => {
+    updater.on('update-not-available', (info: UpdateInfo) => {
       this.opts.log('[AutoUpdate] App is up to date')
       this.notifyRenderer('update-not-available', { version: info.version })
     })
 
     // 下载进度
-    autoUpdater.on('download-progress', (progress) => {
+    updater.on('download-progress', (progress) => {
       this.opts.log(`[AutoUpdate] Downloading: ${Math.round(progress.percent)}%`)
       this.notifyRenderer('download-progress', {
         percent: progress.percent,
@@ -87,14 +105,14 @@ export class AutoUpdateService {
     })
 
     // 下载完成
-    autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
+    updater.on('update-downloaded', (info: UpdateInfo) => {
       this.opts.log(`[AutoUpdate] Update downloaded: ${info.version}`)
       this.notifyRenderer('update-downloaded', { version: info.version })
       this.promptInstall()
     })
 
     // 错误处理
-    autoUpdater.on('error', (err: Error) => {
+    updater.on('error', (err: Error) => {
       this.opts.log(`[AutoUpdate] Error: ${err.message}`)
       this.notifyRenderer('update-error', { message: err.message })
     })
@@ -112,7 +130,7 @@ export class AutoUpdateService {
     }
     this.isChecking = true
     try {
-      await autoUpdater.checkForUpdates()
+      await getAutoUpdater().checkForUpdates()
     } catch (err) {
       this.opts.log(`[AutoUpdate] Check failed: ${(err as Error).message}`)
     } finally {
@@ -125,7 +143,7 @@ export class AutoUpdateService {
    */
   quitAndInstall(): void {
     this.ensureSetup()
-    autoUpdater.quitAndInstall()
+    getAutoUpdater().quitAndInstall()
   }
 
   /**

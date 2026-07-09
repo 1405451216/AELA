@@ -519,6 +519,9 @@ export const IPC_CHANNELS = {
   SYNC_FILE_CHANGE: 'sync:file:change',
   SYNC_CONFLICT: 'sync:conflict',
   SYNC_RESOLVE: 'sync:resolve',
+
+  // ===== Dialog（原生对话框） =====
+  DIALOG_SHOW_OPEN: 'dialog:show-open',
 } as const
 
 // ===== IPC 响应类型 =====

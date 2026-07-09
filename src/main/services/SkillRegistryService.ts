@@ -4,14 +4,27 @@ import { join, dirname } from 'path'
 import { tmpdir, homedir } from 'os'
 import { pipeline } from 'stream/promises'
 import { createGunzip } from 'zlib'
+import { createReadStream } from 'fs'
 import type { SkillRegistryEntry, InstalledSkillInfo } from '@shared/types/skill'
+import { lazyRequire } from '../utils/nativeRequire'
 
 // Manual tar module type declaration
-declare const tar: {
+type TarModule = {
   x: (options: { cwd: string; strip?: number }) => NodeJS.ReadWriteStream
 }
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const tarImpl: typeof tar = require('tar')
+
+let _tarImpl: TarModule | null = null
+function getTar(): TarModule {
+  if (!_tarImpl) {
+    _tarImpl = lazyRequire<TarModule>('tar')
+  }
+  return _tarImpl
+}
+
+/** 默认网络请求超时（30 秒） */
+const NET_FETCH_TIMEOUT_MS = 30_000
+/** 最大响应体大小（50 MB），防止内存耗尽 */
+const MAX_RESPONSE_SIZE = 50 * 1024 * 1024
 
 export interface SkillInstallResult {
   success: boolean
@@ -112,6 +125,11 @@ export class SkillRegistryService {
 
   /** 安装 skill（下载 tgz -> 解压 -> 校验） */
   async installSkill(entry: SkillRegistryEntry): Promise<SkillInstallResult> {
+    // 验证 skill ID 不包含路径分隔符或 ..，防止路径穿越
+    if (!entry.id || /[\\/]/.test(entry.id) || entry.id.includes('..')) {
+      return { success: false, skillId: entry.id, error: 'Invalid skill ID: path separators are not allowed' }
+    }
+
     const tmpDir = join(tmpdir(), 'aela-skill-install', entry.id)
     const tmpFile = join(tmpDir, 'skill.tgz')
     const targetDir = join(this.getUserSkillsDir(), entry.id)
@@ -155,21 +173,46 @@ export class SkillRegistryService {
     }
   }
 
-  /** 网络请求 */
+  /** 网络请求（带超时和大小限制） */
   private netFetch(url: string): Promise<string> {
     return new Promise((resolve, reject) => {
       const request = net.request(url)
+      const timer = setTimeout(() => {
+        request.abort()
+        reject(new Error(`Request timeout after ${NET_FETCH_TIMEOUT_MS}ms`))
+      }, NET_FETCH_TIMEOUT_MS)
+
       request.on('response', (response) => {
         if (response.statusCode !== 200) {
+          clearTimeout(timer)
           reject(new Error(`HTTP ${response.statusCode}`))
           return
         }
         const chunks: Buffer[] = []
-        response.on('data', (chunk: Buffer) => chunks.push(chunk))
-        response.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')))
-        response.on('error', reject)
+        let totalSize = 0
+        response.on('data', (chunk: Buffer) => {
+          totalSize += chunk.length
+          if (totalSize > MAX_RESPONSE_SIZE) {
+            clearTimeout(timer)
+            request.abort()
+            reject(new Error(`Response exceeds maximum size of ${MAX_RESPONSE_SIZE} bytes`))
+            return
+          }
+          chunks.push(chunk)
+        })
+        response.on('end', () => {
+          clearTimeout(timer)
+          resolve(Buffer.concat(chunks).toString('utf-8'))
+        })
+        response.on('error', (err) => {
+          clearTimeout(timer)
+          reject(err)
+        })
       })
-      request.on('error', reject)
+      request.on('error', (err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
       request.end()
     })
   }
@@ -184,16 +227,18 @@ export class SkillRegistryService {
   /** 解压 tarball */
   private async extractTarball(tgzPath: string, dest: string): Promise<void> {
     await mkdir(dest, { recursive: true })
+    const tarStream = getTar().x({ cwd: dest, strip: 1 })
+    // 监听 entry 事件，拒绝包含 .. 的条目（防止 Tar Slip）
+    ;(tarStream as any).on('entry', (entry: any) => {
+      const entryPath: string = entry.path || ''
+      if (entryPath.includes('..')) {
+        entry.abort(new Error(`Unsafe tar entry path: ${entryPath}`))
+      }
+    })
     await pipeline(
-      await this.createReadStream(tgzPath),
+      createReadStream(tgzPath),
       createGunzip(),
-      tarImpl.x({ cwd: dest, strip: 1 })
+      tarStream
     )
-  }
-
-  /** 创建可读流（兼容 fs/promises） */
-  private async createReadStream(path: string): Promise<NodeJS.ReadableStream> {
-    const fs = await import('fs')
-    return fs.createReadStream(path)
   }
 }

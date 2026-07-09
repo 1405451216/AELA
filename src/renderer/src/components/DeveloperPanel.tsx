@@ -35,6 +35,7 @@ export default function DeveloperPanel({ open, onClose }: DeveloperPanelProps) {
   const refreshLogs = useCallback(async () => {
     try {
       const entries = await window.aela.ipcMonitor.getEntries() as IpcLogEntry[]
+      setLogs(entries)
     } catch {
       // ignore
     }

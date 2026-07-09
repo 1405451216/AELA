@@ -7,12 +7,10 @@ import { app } from 'electron'
 import { randomUUID } from 'crypto'
 import { existsSync, unlinkSync } from 'fs'
 import { join } from 'path'
-import { createRequire } from 'node:module'
 import type BetterSqlite3 from 'better-sqlite3'
 import type { Session, ChatMessage, SessionSearchResult, SessionExportOptions, SessionExportResult, SessionContextInfo, ContextWindowConfig } from '@shared/types'
-
-const require = createRequire(import.meta.url)
-const DatabaseConstructor: typeof BetterSqlite3 = require('better-sqlite3')
+import { lazyRequire } from '../utils/nativeRequire'
+import { buildSafeFTSMatch, escapeLikePattern } from '../utils/ftsQuery'
 
 // 行类型映射
 interface SessionRow {
@@ -26,6 +24,7 @@ interface SessionRow {
   updatedAt: string
   messageCount: number
   parentId: string | null
+  branchMessageId: string | null
 }
 
 interface MessageRow {
@@ -65,6 +64,7 @@ function rowToSession(row: SessionRow): Session {
       updatedAt: row.updatedAt,
       messageCount: row.messageCount,
       parentId: row.parentId ?? null,
+      branchMessageId: row.branchMessageId ?? null,
     }
   }
 
@@ -86,14 +86,16 @@ export class SessionStore {
 
   constructor() {
     const dbPath = join(app.getPath('userData'), 'aela-sessions.db')
-    this.db = new DatabaseConstructor(dbPath)
+    this.db = new (lazyRequire<typeof BetterSqlite3>('better-sqlite3'))(dbPath)
     this.db.pragma('journal_mode = WAL')
     this.db.pragma('synchronous = NORMAL')
     this.db.pragma('foreign_keys = ON')
 
     this.createTables()
-    this.rebuildFtsIndex()
+    this.migrateColumns()
     this.migrateFromJson()
+    // 迁移后再构建 FTS 索引（确保迁移数据也被索引）
+    this.rebuildFtsIndex()
   }
 
   private createTables(): void {
@@ -125,7 +127,6 @@ export class SessionStore {
       );
 
       CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(sessionId);
-      CREATE INDEX IF NOT EXISTS idx_messages_content ON messages(content);
 
       -- FTS5 全文搜索虚拟表：解决 LOWER(content) LIKE '%..%' 全表扫描问题
       CREATE VIRTUAL TABLE IF NOT EXISTS messages_fts USING fts5(
@@ -149,9 +150,25 @@ export class SessionStore {
     `)
   }
 
-  /** 为已有数据构建 FTS 索引（迁移后一次性调用） */
+  /** 为旧版数据库补齐新增列（CREATE TABLE IF NOT EXISTS 不会修改已存在的表） */
+  private migrateColumns(): void {
+    const cols = this.db.prepare('PRAGMA table_info(sessions)').all() as Array<{ name: string }>
+    const colNames = new Set(cols.map(c => c.name))
+    if (!colNames.has('parentId')) {
+      this.db.exec('ALTER TABLE sessions ADD COLUMN parentId TEXT')
+    }
+    if (!colNames.has('branchMessageId')) {
+      this.db.exec('ALTER TABLE sessions ADD COLUMN branchMessageId TEXT')
+    }
+  }
+
+  /** 为已有数据构建 FTS 索引（迁移后或索引损坏时调用） */
   private rebuildFtsIndex(): void {
-    this.db.exec(`INSERT INTO messages_fts(messages_fts) VALUES('rebuild')`);
+    try {
+      this.db.exec(`INSERT INTO messages_fts(messages_fts) VALUES('rebuild')`);
+    } catch {
+      // FTS 索引可能不存在或已损坏，忽略错误
+    }
   }
 
   /**
@@ -164,7 +181,7 @@ export class SessionStore {
 
     try {
       // 动态导入 electron-store 以读取旧数据
-      const Store = require('electron-store')
+      const Store = lazyRequire<typeof import('electron-store')['default']>('electron-store')
       const oldStore = new Store({
         name: 'aela-sessions',
         defaults: { sessions: [], messages: {} }
@@ -370,8 +387,8 @@ export class SessionStore {
       JSON.stringify(updated.activeSkillIds),
       updated.updatedAt,
       updated.messageCount,
-      (updated as Session).parentId ?? null,
-      (updated as Session).parentId ? existing.parentId ?? null : null,
+      updated.parentId ?? null,
+      updated.branchMessageId ?? existing.branchMessageId ?? null,
       id
     )
   }
@@ -435,9 +452,9 @@ export class SessionStore {
 
   // 搜索所有会话中的消息 — 使用 FTS5 全文索引替代 LOWER(content) LIKE 全表扫描
   searchMessages(query: string, limit: number = 20): Array<{ session: Session; message: ChatMessage }> {
-    // FTS5 查询语法：将空格分隔的 token 用 AND 连接，支持前缀匹配
-    const ftsQuery = query.trim().split(/\s+/).filter(Boolean).map(t => `${t}*`).join(' ')
-    if (!ftsQuery) return []
+    // 使用共享工具函数转义 FTS5 查询，防止特殊字符导致语法错误或注入
+    const safeMatch = buildSafeFTSMatch(query)
+    if (!safeMatch) return []
 
     const rows = this.db.prepare(
       `SELECT m.*, s.id as s_id, s.title as s_title, s.workspaceId as s_workspaceId,
@@ -451,7 +468,7 @@ export class SessionStore {
        WHERE messages_fts MATCH ?
        ORDER BY s.updatedAt DESC
        LIMIT ?`
-    ).all(ftsQuery, limit) as SessionSearchRow[]
+    ).all(safeMatch, limit) as SessionSearchRow[]
 
     return rows.map((row) => ({
       session: rowToSession({
@@ -507,11 +524,13 @@ export class SessionStore {
     const sessionsToCheck = sessionRows.filter(r => !r.title.toLowerCase().includes(lowerQuery))
 
     // 单次批量查询替代 N+1：用 IN 子句一次拉取所有候选消息
+    // 转义 LIKE 通配符（% 和 _）防止通配符注入
     if (sessionsToCheck.length > 0) {
       const placeholders = sessionsToCheck.map(() => '?').join(',')
+      const escapedQuery = escapeLikePattern(lowerQuery)
       const allMsgRows = this.db.prepare(
-        `SELECT * FROM messages WHERE sessionId IN (${placeholders}) AND LOWER(content) LIKE ?`
-      ).all(...sessionsToCheck.map(s => s.id), `%${lowerQuery}%`) as MessageRow[]
+        `SELECT * FROM messages WHERE sessionId IN (${placeholders}) AND LOWER(content) LIKE ? ESCAPE '\\'`
+      ).all(...sessionsToCheck.map(s => s.id), `%${escapedQuery}%`) as MessageRow[]
 
       // 按 sessionId 分组
       const msgsBySession = new Map<string, MessageRow[]>()

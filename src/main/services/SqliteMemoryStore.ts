@@ -8,10 +8,8 @@
 
 import type BetterSqlite3 from 'better-sqlite3'
 import type { MemoryEpisode, MemoryStats, MemoryFTSResult, MemoryFTSStats } from '@shared/types'
-import { createRequire } from 'node:module'
-
-const require = createRequire(import.meta.url)
-const DatabaseConstructor: typeof BetterSqlite3 = require('better-sqlite3')
+import { lazyRequire } from '../utils/nativeRequire'
+import { preprocessForFTS, sanitizeFTSQuery, escapeLikePattern } from '../utils/ftsQuery'
 
 interface EpisodeRow {
   id: string
@@ -44,38 +42,6 @@ interface AvgRow { avg_len?: number }
 interface IdRow { id: string }
 
 /**
- * 预处理文本以支持 CJK 分词
- * unicode61 分词器默认将连续的 CJK 字符视为一个 token
- * 通过在 CJK 字符之间插入空格，使每个中文字符成为独立 token
- * 这样搜索"错误分析"时，FTS5 会匹配同时包含"错""误""分""析"的文档
- */
-function preprocessForFTS(text: string): string {
-  if (!text) return ''
-  // 在 CJK 字符两侧插入空格
-  return text.replace(/([\u4e00-\u9fff\u3400-\u4dbf\u3040-\u30ff\uac00-\ud7af])/g, ' $1 ')
-}
-
-/**
- * 将用户查询转义为安全的 FTS5 MATCH 表达式
- *
- * FTS5 MATCH 语法中，双引号包裹的是「字符串字面量」(phrase)，
- * 不会被解释为 FTS5 操作符（AND, OR, NOT, NEAR, *, ^, : 等）。
- * 我们将每个 token 用双引号包裹，并将 token 内部的双引号替换为空格。
- *
- * 例如:
- *   输入: error) "test"
- *   预处理后: error )  test
- *   安全 MATCH: "error" ")" "test"
- */
-function sanitizeFTSQuery(preprocessedQuery: string): string {
-  const tokens = preprocessedQuery
-    .split(/[\s]+/)
-    .filter(t => t.length > 0)
-    .map(t => '"' + t.replace(/"/g, ' ') + '"')
-  return tokens.join(' ')
-}
-
-/**
  * 从 FTS5 MATCH 查询中提取匹配的 token 列表
  */
 function extractMatchedTokens(query: string): string[] {
@@ -97,7 +63,7 @@ export class SqliteMemoryStore {
   private db: BetterSqlite3.Database
 
   constructor(dbPath: string) {
-    this.db = new DatabaseConstructor(dbPath)
+    this.db = new (lazyRequire<typeof BetterSqlite3>('better-sqlite3'))(dbPath)
     this.db.pragma('journal_mode = WAL')
     this.db.pragma('synchronous = NORMAL')
 
@@ -174,8 +140,10 @@ export class SqliteMemoryStore {
     offset?: number
     roleFilter?: string
   }): MemoryEpisode[] {
-    let sql = 'SELECT * FROM episodes WHERE (content LIKE ? OR summary LIKE ? OR topics LIKE ?)'
-    const params: unknown[] = [`%${query}%`, `%${query}%`, `%${query}%`]
+    // 转义 LIKE 通配符（% 和 _）防止通配符注入
+    const escapedQuery = escapeLikePattern(query)
+    let sql = "SELECT * FROM episodes WHERE (content LIKE ? ESCAPE '\\' OR summary LIKE ? ESCAPE '\\' OR topics LIKE ? ESCAPE '\\')"
+    const params: unknown[] = [`%${escapedQuery}%`, `%${escapedQuery}%`, `%${escapedQuery}%`]
     if (opts?.sessionId) {
       sql += ' AND session_id = ?'
       params.push(opts.sessionId)
@@ -257,8 +225,9 @@ export class SqliteMemoryStore {
     sessionId?: string
     limit?: number
   }): MemoryEpisode[] {
-    let sql = 'SELECT * FROM episodes WHERE topics LIKE ?'
-    const params: unknown[] = [`%${tag}%`]
+    const escapedTag = escapeLikePattern(tag)
+    let sql = "SELECT * FROM episodes WHERE topics LIKE ? ESCAPE '\\'"
+    const params: unknown[] = [`%${escapedTag}%`]
     if (opts?.sessionId) {
       sql += ' AND session_id = ?'
       params.push(opts.sessionId)
@@ -302,7 +271,8 @@ export class SqliteMemoryStore {
         const idValues = ids.map(r => r.id)
         const placeholders = idValues.map(() => '?').join(',')
         this.db.prepare(`DELETE FROM episodes_fts WHERE episode_id IN (${placeholders})`).run(...idValues)
-        this.db.prepare('DELETE FROM episodes WHERE created_at < ?').run(cutoff)
+        // 用 ID 删除主表记录，确保与 FTS 删除完全对应
+        this.db.prepare(`DELETE FROM episodes WHERE id IN (${placeholders})`).run(...idValues)
       }
       return ids.length
     })
@@ -423,7 +393,7 @@ export class SqliteMemoryStore {
         `).get() as CountRow | undefined
         indexSizeKB = Math.round((shadowRow?.cnt ?? 0) * 0.1)
       } catch (err) {
-        // shadow 表统计失败时忽略，indexSizeKB 保持上一轮估算值
+        // shadow 表统计也失败，indexSizeKB 保持 0
         console.error('[SqliteMemoryStore] shadow table size estimation failed:', err)
       }
     }

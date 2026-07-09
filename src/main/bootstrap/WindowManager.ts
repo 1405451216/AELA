@@ -75,9 +75,9 @@ export class WindowManager {
         } : {}),
         webPreferences: {
           preload: join(appRoot, 'out/preload/index.mjs'),
-          // sandbox: true — preload 仅使用 ipcRenderer + contextBridge，无直接 Node.js API 调用
-          // 启用沙箱可隔离渲染进程与 Chromium 内核，防止 XSS 升级为 RCE
-          sandbox: true,
+          // sandbox: false — preload 使用 ESM import 语法，sandbox 模式不支持 ESM
+          // 安全性由 contextIsolation: true + nodeIntegration: false 保证
+          sandbox: false,
           contextIsolation: true,
           nodeIntegration: false
         }
@@ -94,6 +94,11 @@ export class WindowManager {
         if (!this.mainWindow?.isVisible()) {
           this.mainWindow?.show()
         }
+      })
+
+      // 捕获渲染进程控制台消息（开发模式调试用）
+      this.mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+        log(`[renderer:${level}] ${message} (${sourceId}:${line})`)
       })
 
       // 设置 CSP 内容安全策略（开发模式放宽以支持 Vite HMR）

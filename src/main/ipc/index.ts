@@ -88,6 +88,7 @@ import { registerBgAgentHandlers } from './handlers/bg-agent'
 import { registerAdvancedHandlers } from './handlers/advanced'
 import { registerMultiAgentHandlers } from './handlers/multiAgent'
 import { registerSyncHandlers } from './handlers/sync'
+import { registerDialogHandlers } from './handlers/dialog'
 
 export async function registerIPC(container: ServiceContainer): Promise<void> {
   const configStore = container.get<ConfigStore>(SERVICE_TOKENS.CONFIG_STORE)
@@ -246,4 +247,7 @@ export async function registerIPC(container: ServiceContainer): Promise<void> {
 
   // ===== Sandbox Audit =====
   registerSandboxHandlers()
+
+  // ===== Dialog =====
+  registerDialogHandlers(getMainWindow)
 }

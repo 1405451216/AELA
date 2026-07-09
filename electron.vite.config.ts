@@ -23,7 +23,7 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin({ exclude: BUNDLE_DEPS })],
     resolve: {
       alias: {
-        '@shared/types': resolve('src/shared/types/index.ts'),
+        '@shared/types': resolve('src/shared/types'),
         '@shared': resolve('src/shared'),
         '@main': resolve('src/main'),
         '@agentprimordia/sdk': resolve(SDK_DIST, 'index.js')
@@ -36,7 +36,7 @@ export default defineConfig({
         input: {
           index: resolve('src/main/index.ts')
         },
-        external: ['electron', 'better-sqlite3', 'node:crypto', 'node:fs', 'node:path', 'node:module', 'node:child_process', 'node:url', 'node:os', 'node-llama-cpp']
+        external: ['electron', 'better-sqlite3', 'electron-updater', 'electron-log', 'node:crypto', 'node:fs', 'node:path', 'node:module', 'node:child_process', 'node:url', 'node:os', 'node-llama-cpp']
       }
     }
   },
@@ -44,7 +44,7 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin({ exclude: BUNDLE_DEPS })],
     resolve: {
       alias: {
-        '@shared/types': resolve('src/shared/types/index.ts'),
+        '@shared/types': resolve('src/shared/types'),
         '@shared': resolve('src/shared'),
         '@agentprimordia/sdk': resolve(SDK_DIST, 'index.js')
       }

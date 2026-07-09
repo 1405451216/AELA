@@ -19,6 +19,8 @@ export interface Session {
   updatedAt: string
   messageCount: number
   parentId?: string | null
+  /** 分支点消息 ID（仅分支会话有值） */
+  branchMessageId?: string | null
 }
 
 export interface ChatMessage {
